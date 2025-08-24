@@ -3,25 +3,42 @@ import { onboarding } from "@/constants";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { Dimensions, Text, TouchableOpacity, View } from "react-native";
-import { useSharedValue } from "react-native-reanimated";
-import Carousel, {
-  ICarouselInstance,
-  Pagination,
-} from "react-native-reanimated-carousel";
+import {
+  Dimensions,
+  FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 const { width } = Dimensions.get("window");
 
 const Onboarding = () => {
-  const carouselRef = useRef<ICarouselInstance>(null);
-  const progress = useSharedValue(0);
+  const flatListRef = useRef<FlatList>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-
   const isLastSlide = activeIndex === onboarding.length - 1;
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / width);
+    setActiveIndex(index);
+  };
+
+  const handleNext = () => {
+    if (isLastSlide) {
+      router.replace("/(auth)/sign-up");
+    } else {
+      flatListRef.current?.scrollToIndex({
+        index: activeIndex + 1,
+        animated: true,
+      });
+    }
+  };
 
   return (
     <View className="flex h-full items-center justify-between bg-white">
-      {/* Bouton "Passer" */}
+      {/* Bouton Passer */}
       <TouchableOpacity
         onPress={() => router.replace("/(auth)/sign-up")}
         className="w-full flex justify-end items-end p-5"
@@ -31,25 +48,22 @@ const Onboarding = () => {
         </Text>
       </TouchableOpacity>
 
-      {/* Carousel */}
-      <Carousel
-        ref={carouselRef}
-        width={width}
-        height={500}
+      {/* Slides avec FlatList */}
+      <FlatList
+        ref={flatListRef}
         data={onboarding}
-        loop={false} // 👈 pas de boucle infinie
-        onProgressChange={(_, absoluteProgress) => {
-          progress.value = absoluteProgress; // 👈 clé pour les dots
-          setActiveIndex(Math.round(absoluteProgress));
-        }}
+        keyExtractor={(item) => item.id.toString()}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
         renderItem={({ item }) => (
-          <View className="flex items-center">
+          <View style={{ width }}>
             <Image
               source={item.image}
               style={{ width: "100%", height: 350 }}
               contentFit="cover"
             />
-
             <View className="relative -top-8">
               <View className="flex flex-row items-center justify-center w-full mt-10">
                 <Text className="text-black text-3xl font-bold mx-10 text-center">
@@ -64,32 +78,25 @@ const Onboarding = () => {
         )}
       />
 
-      {/* Pagination synchronisée */}
-      <Pagination.Basic
-        progress={progress}
-        data={onboarding}
-        dotStyle={{
-          backgroundColor: "#E2E8F0",
-          borderRadius: 50,
-          width: 32,
-          height: 6,
-        }}
-        activeDotStyle={{ backgroundColor: "#0286FF" }}
-        containerStyle={{ gap: 8, marginVertical: 10 }}
-      />
+      {/* Dots */}
+      <View className="flex flex-row items-center justify-center mt-4">
+        {onboarding.map((_, i) => (
+          <View
+            key={i}
+            className={`h-1 mx-1 rounded-full ${
+              i === activeIndex
+                ? "bg-[#0286FF] w-[32px]"
+                : "bg-[#E2E8F0] w-[32px]"
+            }`}
+          />
+        ))}
+      </View>
 
-      {/* Bouton suivant */}
+      {/* Bouton suivant / commencer */}
       <CustomButton
         title={isLastSlide ? "Commencer" : "Suivant"}
-        onPress={() =>
-          isLastSlide
-            ? router.replace("/(auth)/sign-up")
-            : carouselRef.current?.scrollTo({
-                count: 1,
-                animated: true,
-              })
-        }
-        className="w-11/12 mt-10 mb-8"
+        onPress={handleNext}
+        className="w-11/12 mt-10 mb-8 rounded-md"
       />
     </View>
   );
